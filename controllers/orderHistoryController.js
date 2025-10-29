@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
- import OrderHistory from "../models/OrderHistoryModel.js";
+ import OrderHistory from "../models/orderHistoryModel.js";
 import Order from "../models/orderModel.js";
 import User from "../models/userModel.js";
 
