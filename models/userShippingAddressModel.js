@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 
 const baseAddressFields = {
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+
+  // Address details
   label: { type: String, trim: true, default: "Home" },
   fullName: { type: String, required: true, trim: true },
   phone: { type: String, required: true, trim: true },
@@ -14,10 +16,22 @@ const baseAddressFields = {
   country: { type: String, required: true, trim: true, default: "India" },
   message: { type: String, trim: true },
   isDefault: { type: Boolean, default: false },
+
+  // 🧾 Simple payment method field
+  paymentMethod: {
+    type: String,
+    enum: ["COD", "Online", "Card", "UPI", "NetBanking"],
+    default: "COD",
+  },
 };
 
- 
-const userShippingAddressSchema = new mongoose.Schema(baseAddressFields, { timestamps: true });
- 
-const   UserShippingAddress = mongoose.model("UserShippingAddress", userShippingAddressSchema);
+const userShippingAddressSchema = new mongoose.Schema(baseAddressFields, {
+  timestamps: true,
+});
+
+const UserShippingAddress = mongoose.model(
+  "UserShippingAddress",
+  userShippingAddressSchema
+);
+
 export default UserShippingAddress;

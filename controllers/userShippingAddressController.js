@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import UserShippingAddress from "../models/userShippingAddressModel.js";
-import User from "../models/userModel.js"; // Make sure this path matches your project
+import User from "../models/userModel.js"; // Make sure this path is correct
 
 // ===============================
 // CREATE SHIPPING ADDRESS
@@ -9,18 +9,26 @@ export const createShippingAddress = async (req, res) => {
   try {
     const data = req.body;
 
-    // Validate userId
+    // ✅ Validate userId
     if (!mongoose.Types.ObjectId.isValid(data.user)) {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    // Check if user exists
+    // ✅ Check if user exists
     const existingUser = await User.findById(data.user);
     if (!existingUser) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // If isDefault is true, unset previous default addresses
+    // ✅ Validate paymentMethod
+    const validPaymentMethods = ["COD", "Online", "Card", "UPI", "NetBanking"];
+    if (data.paymentMethod && !validPaymentMethods.includes(data.paymentMethod)) {
+      return res.status(400).json({
+        message: `Invalid payment method. Allowed: ${validPaymentMethods.join(", ")}`,
+      });
+    }
+
+    // ✅ If isDefault is true, unset previous default addresses
     if (data.isDefault) {
       await UserShippingAddress.updateMany(
         { user: data.user },
@@ -28,13 +36,20 @@ export const createShippingAddress = async (req, res) => {
       );
     }
 
-    // Create new address
-    const newAddress = new UserShippingAddress(data);
-    const savedAddress = await newAddress.save();
+    // ✅ Create new address with payment method
+    const newAddress = new UserShippingAddress({
+      ...data,
+      paymentMethod: data.paymentMethod || "COD", // default fallback
+    });
 
-    res.status(201).json({ message: "Address created successfully", data: savedAddress });
+    const savedAddress = await newAddress.save();
+    res
+      .status(201)
+      .json({ message: "Address created successfully", data: savedAddress });
   } catch (error) {
-    res.status(500).json({ message: "Error creating address", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error creating address", error: error.message });
   }
 };
 
@@ -49,10 +64,15 @@ export const getUserAddresses = async (req, res) => {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    const addresses = await UserShippingAddress.find({ user: userId }).sort({ createdAt: -1 });
+    const addresses = await UserShippingAddress.find({ user: userId }).sort({
+      createdAt: -1,
+    });
+
     res.status(200).json({ data: addresses });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching addresses", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error fetching addresses", error: error.message });
   }
 };
 
@@ -68,11 +88,14 @@ export const getAddressById = async (req, res) => {
     }
 
     const address = await UserShippingAddress.findById(id);
-    if (!address) return res.status(404).json({ message: "Address not found" });
+    if (!address)
+      return res.status(404).json({ message: "Address not found" });
 
     res.status(200).json({ data: address });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching address", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error fetching address", error: error.message });
   }
 };
 
@@ -89,9 +112,21 @@ export const updateShippingAddress = async (req, res) => {
     }
 
     const currentAddress = await UserShippingAddress.findById(id);
-    if (!currentAddress) return res.status(404).json({ message: "Address not found" });
+    if (!currentAddress)
+      return res.status(404).json({ message: "Address not found" });
 
-    // If isDefault is true, unset previous default addresses
+    // ✅ Validate payment method if provided
+    const validPaymentMethods = ["COD", "Online", "Card", "UPI", "NetBanking"];
+    if (
+      updateData.paymentMethod &&
+      !validPaymentMethods.includes(updateData.paymentMethod)
+    ) {
+      return res.status(400).json({
+        message: `Invalid payment method. Allowed: ${validPaymentMethods.join(", ")}`,
+      });
+    }
+
+    // ✅ Handle default address switch
     if (updateData.isDefault) {
       await UserShippingAddress.updateMany(
         { user: currentAddress.user, _id: { $ne: id } },
@@ -99,10 +134,21 @@ export const updateShippingAddress = async (req, res) => {
       );
     }
 
-    const updatedAddress = await UserShippingAddress.findByIdAndUpdate(id, updateData, { new: true });
-    res.status(200).json({ message: "Address updated successfully", data: updatedAddress });
+    // ✅ Update address (including payment method)
+    const updatedAddress = await UserShippingAddress.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
+    );
+
+    res.status(200).json({
+      message: "Address updated successfully",
+      data: updatedAddress,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error updating address", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error updating address", error: error.message });
   }
 };
 
@@ -118,10 +164,13 @@ export const deleteShippingAddress = async (req, res) => {
     }
 
     const deletedAddress = await UserShippingAddress.findByIdAndDelete(id);
-    if (!deletedAddress) return res.status(404).json({ message: "Address not found" });
+    if (!deletedAddress)
+      return res.status(404).json({ message: "Address not found" });
 
     res.status(200).json({ message: "Address deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Error deleting address", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error deleting address", error: error.message });
   }
 };

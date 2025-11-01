@@ -8,22 +8,23 @@ const cartItemSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Snapshot of product details at the time item added to cart
+    // Snapshot of product details at the time added
     productSnapshot: {
       name: { type: String, required: true },
       slug: { type: String },
       category: { type: String },
       subCategory: { type: String },
-      price: { type: Number, required: true },
+      price: { type: Number, required: true }, // actual product price
+      discountPrice: { type: Number, default: 0 }, // discounted price
       image: { type: String },
       stock: { type: Number, default: 0 },
       weight: { type: String },
     },
 
-    // Optional variant (e.g., size, color)
+    // Optional variant (size, color, etc.)
     variant: {
       type: Map,
-      of: String, // flexible for { size: 'L', color: 'Red' }
+      of: String,
       default: {},
     },
 
@@ -39,13 +40,24 @@ const cartItemSchema = new mongoose.Schema(
       required: true,
       default: 0,
     },
+
+    // ✅ total discount applied on this item
+    itemDiscount: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
 
-// Auto-calculate subtotal before saving
+// Auto-calculate subtotal and discount before saving
 cartItemSchema.pre("validate", function (next) {
-  this.subtotal = this.quantity * this.productSnapshot.price;
+  const actualPrice = this.productSnapshot.price;
+  const discountedPrice = this.productSnapshot.discountPrice || actualPrice;
+
+  this.itemDiscount = (actualPrice - discountedPrice) * this.quantity;
+  this.subtotal = discountedPrice * this.quantity;
+
   next();
 });
 
@@ -60,11 +72,7 @@ const cartSchema = new mongoose.Schema(
 
     items: [cartItemSchema],
 
-    coupon: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Coupon",
-    },
-
+    // total discount = product discounts only
     discount: {
       type: Number,
       default: 0,
@@ -90,33 +98,16 @@ const cartSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Recalculate totals before saving
+// ✅ Auto-calculate totals before saving
 cartSchema.pre("save", function (next) {
-  let total = this.items.reduce((acc, item) => acc + item.subtotal, 0);
-  this.totalPrice = total;
-  this.grandTotal = total - (this.discount || 0);
+  const productTotal = this.items.reduce((acc, item) => acc + item.subtotal, 0);
+  const productDiscounts = this.items.reduce((acc, item) => acc + item.itemDiscount, 0);
+
+  this.totalPrice = productTotal + productDiscounts; // total original prices
+  this.discount = productDiscounts; // only product-level discounts
+  this.grandTotal = productTotal; // final amount after discounts
+
   next();
 });
-
-// Method: apply a coupon dynamically
-cartSchema.methods.applyCoupon = async function (coupon) {
-  if (!coupon) return;
-
-  // Example: Check expiry
-  if (coupon.expiry && new Date() > new Date(coupon.expiry)) {
-    throw new Error("Coupon has expired.");
-  }
-
-  // Example: Check min order requirement
-  if (coupon.minAmount && this.totalPrice < coupon.minAmount) {
-    throw new Error(`Minimum order amount for this coupon is ₹${coupon.minAmount}`);
-  }
-
-  // Apply discount
-  this.coupon = coupon._id;
-  this.discount = coupon.discountValue || 0;
-  this.grandTotal = this.totalPrice - this.discount;
-  await this.save();
-};
 
 export default mongoose.model("Cart", cartSchema);

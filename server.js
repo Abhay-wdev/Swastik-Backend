@@ -19,7 +19,9 @@ import paymentAttemptRoutes from "./routes/paymentAttemptRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import auth from "./routes/auth.js";
 import heroImageRoutes from "./routes/heroImageRoutes.js";
-
+import blogRoutes from "./routes/blogRoutes.js";
+import companyRoutes from "./routes/companyRoutes.js";
+import contactRoutes from "./routes/contactRoutes.js";
 dotenv.config();
 
 const app = express();
@@ -48,8 +50,9 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/payment-attempt", paymentAttemptRoutes);
 app.use("/api/hero", heroImageRoutes);
 app.use("/api/auth", auth);
-
-
+app.use("/api/blogs", blogRoutes);
+app.use("/api/company", companyRoutes);
+app.use("/api/contact", contactRoutes);
 
 app.get("/", (req, res) => res.send("API is running"));
 

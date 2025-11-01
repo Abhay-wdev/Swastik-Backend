@@ -1,43 +1,37 @@
 import express from "express";
 import {
-  createOrder,
-  getOrderById,
-  getOrdersByUser,
+  placeOrder,
   getAllOrders,
-  updateOrderStatus,
-  addPaymentAttempt,
-  applyCoupon,
-  addReturnRequest,
-  deleteOrder
+  getUserOrders,
+  getOrderById,
+  updateOrder,
+  deleteOrder,
 } from "../controllers/orderController.js";
+import { generateInvoice } from "../controllers/invoiceController.js";
+import { protect } from "../middlewares/authMiddleware.js";
+import { allowRoles } from "../middlewares/roleMiddleware.js";
 
 const router = express.Router();
 
-// CREATE ORDER
-router.post("/", createOrder);
+// 🟢 Create new order
+router.post("/place-order",protect, placeOrder);
 
-// GET ORDER BY ID
-router.get("/:id", getOrderById);
+// 🟡 Get all orders (Admin)
+router.get("/", protect, allowRoles("admin", "seller", "manager") , getAllOrders);
 
-// GET ORDERS BY USER
-router.get("/user/:userId", getOrdersByUser);
+// 🟠 Get user orders
+router.get("/user/:userId", protect, getUserOrders);
 
-// GET ALL ORDERS (Admin)
-router.get("/", getAllOrders);
+// 🔵 Get single order
+router.get("/:orderId", protect, getOrderById);
 
-// UPDATE ORDER STATUS
-router.put("/status/:id", updateOrderStatus);
+// 🟣 Update order (Admin or status updates)
+router.put("/:orderId", protect, allowRoles("admin", "seller", "manager"), updateOrder);
 
-// ADD PAYMENT ATTEMPT
-router.post("/payment/:id", addPaymentAttempt);
+// 🔴 Delete order (Admin only)
+router.delete("/:orderId",protect, allowRoles("admin", "seller", "manager"), deleteOrder);
 
-// APPLY COUPON
-router.post("/coupon/:id", applyCoupon);
-
-// ADD RETURN / REFUND REQUEST
-router.post("/return/:id", addReturnRequest);
-
-// SOFT DELETE ORDER
-router.delete("/:id", deleteOrder);
+// 📄 Generate PDF invoice
+router.get("/invoice/:orderId",   generateInvoice);
 
 export default router;

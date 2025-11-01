@@ -16,7 +16,7 @@ router.post("/",protect,allowRoles("admin", "seller", "manager"), upload.single(
 router.get("/", subCategoryController.getSubCategories);
 router.get("/subcategory/:slug", subCategoryController.getSubCategoriesByCategorySlug);
 // GET SINGLE SUBCATEGORY BY ID
-router.get("/:id",protect,allowRoles("admin", "seller", "manager"), subCategoryController.getSubCategoriesByCategoryId);
+router.get("/:id", subCategoryController.getSubCategoriesByCategoryId);
 
 // UPDATE SUBCATEGORY (with optional new image)
 router.put("/:id",protect,allowRoles("admin", "seller", "manager"), upload.single("image"), subCategoryController.updateSubCategory);

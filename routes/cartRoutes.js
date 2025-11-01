@@ -5,7 +5,7 @@ import {
   updateCartItem,
   removeCartItem,
   clearCart,
-  applyCoupon,
+   
 } from "../controllers/cartController.js";
 import { protect } from "../middlewares/authMiddleware.js"; // JWT middleware
 const router = express.Router();
@@ -40,10 +40,6 @@ router.delete("/remove",protect, removeCartItem);
 // ===============================
 router.delete("/clear/:userId",protect, clearCart);
 
-// ===============================
-// APPLY COUPON
-// POST /api/cart/apply-coupon
-// ===============================
-router.post("/apply-coupon",protect, applyCoupon);
+ 
 
 export default router;
