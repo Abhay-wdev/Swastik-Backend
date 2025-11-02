@@ -1,57 +1,83 @@
 // controllers/authController.js
 import UserModel from "../models/userModel.js";
 import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
+import SibApiV3Sdk from "sib-api-v3-sdk";
+import dotenv from "dotenv";
 
-// Temporary OTP store (use Redis in production)
-let otpStore = {};
+dotenv.config();
 
-// ----------------------------
+// ================================
+// INITIALIZE BREVO CLIENT
+// ================================
+const brevoClient = SibApiV3Sdk.ApiClient.instance;
+brevoClient.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
+const emailApi = new SibApiV3Sdk.TransactionalEmailsApi();
+
+let otpStore = {}; // Temporary in-memory OTP store
+
+// ================================
 // SEND REGISTRATION OTP
-// ----------------------------
+// ================================
 export const sendRegistrationOTP = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ message: "Email is required" });
+    if (!email)
+      return res.status(400).json({ success: false, message: "Email is required" });
 
     const existingUser = await UserModel.findOne({ email });
-    if (existingUser) return res.status(400).json({ message: "Email already registered" });
+    if (existingUser)
+      return res.status(400).json({ success: false, message: "Email already registered" });
 
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     otpStore[email] = otp;
 
-    // Send OTP via Gmail
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    const emailData = {
+      sender: { email: process.env.BREVO_EMAIL, name: "Your App Team" },
+      to: [{ email }],
+      subject: "Your Registration OTP Code",
+      htmlContent: `
+        <div style="font-family:Arial,sans-serif;padding:20px;border:1px solid #eee;border-radius:8px;max-width:500px;margin:auto;">
+          <h2 style="color:#4a90e2;">Welcome to Our Platform!</h2>
+          <p>Your One-Time Password (OTP) for registration is:</p>
+          <h1 style="color:#4a90e2;letter-spacing:6px;">${otp}</h1>
+          <p>This OTP will expire in <b>5 minutes</b>.</p>
+          <br/>
+          <p style="font-size:13px;color:#666;">– The Support Team</p>
+        </div>
+      `,
+    };
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "Your Registration OTP",
-      text: `Your OTP code is ${otp}`,
-    });
+    await emailApi.sendTransacEmail(emailData);
 
-    res.status(200).json({ message: "OTP sent to email" });
+    console.log(`✅ OTP sent successfully to ${email}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent successfully! Please check your email.",
+      email,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("❌ Error sending registration OTP:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send OTP. Please try again later.",
+      error: error.message,
+    });
   }
 };
 
-// ----------------------------
+// ================================
 // VERIFY OTP & REGISTER USER
-// ----------------------------
+// ================================
 export const verifyOTPAndRegister = async (req, res) => {
   try {
     const { name, email, password, phone, otp } = req.body;
 
-    if (otpStore[email] !== otp) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
-    }
+    if (!otpStore[email])
+      return res.status(400).json({ success: false, message: "OTP not found or expired" });
+
+    if (otpStore[email] !== otp)
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -66,63 +92,100 @@ export const verifyOTPAndRegister = async (req, res) => {
 
     delete otpStore[email];
 
-    res.status(201).json({ success: true, user });
+    return res.status(201).json({
+      success: true,
+      message: "Registration successful!",
+      user,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("❌ Error verifying OTP and registering:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to register user.",
+      error: error.message,
+    });
   }
 };
 
-// ----------------------------
+// ================================
 // FORGOT PASSWORD – SEND OTP
-// ----------------------------
+// ================================
 export const sendForgotPasswordOTP = async (req, res) => {
   try {
     const { email } = req.body;
     const user = await UserModel.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (!user)
+      return res.status(404).json({ success: false, message: "User not found" });
 
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     otpStore[email] = otp;
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    const emailData = {
+      sender: { email: process.env.BREVO_EMAIL, name: "Your App Team" },
+      to: [{ email }],
+      subject: "Password Reset OTP",
+      htmlContent: `
+        <div style="font-family:Arial,sans-serif;padding:20px;border:1px solid #eee;border-radius:8px;max-width:500px;margin:auto;">
+          <h2>Password Reset Request</h2>
+          <p>Your OTP for resetting your password is:</p>
+          <h1 style="color:#4a90e2;">${otp}</h1>
+          <p>This OTP will expire in <b>5 minutes</b>.</p>
+          <br/>
+          <p style="font-size:13px;color:#666;">– The Support Team</p>
+        </div>
+      `,
+    };
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "Your Password Reset OTP",
-      text: `Your OTP code is ${otp}`,
-    });
+    await emailApi.sendTransacEmail(emailData);
 
-    res.status(200).json({ message: "OTP sent to email" });
+    console.log(`✅ Forgot password OTP sent to ${email}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset OTP sent successfully to your email.",
+      email,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("❌ Error sending forgot password OTP:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send password reset OTP.",
+      error: error.message,
+    });
   }
 };
 
-// ----------------------------
-// RESET PASSWORD AFTER OTP VERIFICATION
-// ----------------------------
+// ================================
+// RESET PASSWORD
+// ================================
 export const resetPassword = async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
 
-    if (otpStore[email] !== otp) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
-    }
+    if (!otpStore[email])
+      return res.status(400).json({ success: false, message: "OTP not found or expired" });
+
+    if (otpStore[email] !== otp)
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await UserModel.findOneAndUpdate({ email }, { password: hashedPassword });
 
     delete otpStore[email];
 
-    res.status(200).json({ message: "Password reset successfully" });
+    console.log(`✅ Password reset successfully for ${email}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "Password has been reset successfully!",
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("❌ Error resetting password:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to reset password. Please try again later.",
+      error: error.message,
+    });
   }
 };

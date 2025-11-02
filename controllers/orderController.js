@@ -9,6 +9,7 @@ export const placeOrder = async (req, res) => {
 
     // Validate address
     const address = await UserShippingAddress.findOne({ _id: addressId, user: userId });
+    console.log("Placing order for user:", userId, "with address:", addressId);
     if (!address) {
       return res.status(404).json({ success: false, message: "Shipping address not found" });
     }
