@@ -7,7 +7,7 @@ import PaymentAttempt from "../models/payment/paymentAttempt.model.js";
 import ReturnModel from "../models/order/return.model.js";
 import { createHistoryEntry, addPaymentAttempt, createReturnRecord, runTransaction } from "./helpers.js";
 import Coupon from "../models/coupon.model.js";
-import OrderHistory from "../models/order/orderHistory.model.js";
+ 
 
 /**
  * Create order (atomic):
