@@ -1,18 +1,11 @@
 // controllers/authController.js
 import UserModel from "../models/userModel.js";
 import bcrypt from "bcryptjs";
-import SibApiV3Sdk from "sib-api-v3-sdk";
 import dotenv from "dotenv";
+import emailApi from "../config/brevo.js"; // ✅ Import configured Brevo client
 
-dotenv.config(); // ✅ Load .env variables
+dotenv.config();
 
-// ================================
-// INITIALIZE BREVO CLIENT (with ENV variables)
-// ================================
-const brevoClient = SibApiV3Sdk.ApiClient.instance;
-brevoClient.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
-
-const emailApi = new SibApiV3Sdk.TransactionalEmailsApi();
 let otpStore = {}; // Temporary in-memory OTP store
 
 // ================================
@@ -32,12 +25,12 @@ export const sendRegistrationOTP = async (req, res) => {
     otpStore[email] = otp;
 
     const emailData = {
-      sender: { email: process.env.BREVO_EMAIL, name: process.env.APP_NAME || "Your App Team" },
+      sender: { email: process.env.BREVO_EMAIL, name: process.env.APP_NAME },
       to: [{ email }],
       subject: "Your Registration OTP Code",
       htmlContent: `
         <div style="font-family:Arial,sans-serif;padding:20px;border:1px solid #eee;border-radius:8px;max-width:500px;margin:auto;">
-          <h2 style="color:#4a90e2;">Welcome to ${process.env.APP_NAME || "Our Platform"}!</h2>
+          <h2 style="color:#4a90e2;">Welcome to ${process.env.APP_NAME}!</h2>
           <p>Your One-Time Password (OTP) for registration is:</p>
           <h1 style="color:#4a90e2;letter-spacing:6px;">${otp}</h1>
           <p>This OTP will expire in <b>5 minutes</b>.</p>
@@ -121,7 +114,7 @@ export const sendForgotPasswordOTP = async (req, res) => {
     otpStore[email] = otp;
 
     const emailData = {
-      sender: { email: process.env.BREVO_EMAIL, name: process.env.APP_NAME || "Your App Team" },
+      sender: { email: process.env.BREVO_EMAIL, name: process.env.APP_NAME },
       to: [{ email }],
       subject: "Password Reset OTP",
       htmlContent: `
