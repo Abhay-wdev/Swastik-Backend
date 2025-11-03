@@ -14,7 +14,7 @@ const router = express.Router();
 // GET CART FOR USER
 // GET /api/cart/:userId
 // ===============================
-router.get("/:userId",protect, getCart);
+router.get("/:userId", getCart);
 
 // ===============================
 // ADD ITEM TO CART

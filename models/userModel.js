@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema(
       enum: ["customer", "admin", "seller", "manager"],
       default: "customer",
     },
-    shippingAddress: [{ type: mongoose.Schema.Types.ObjectId, ref: "UserShippingAddress" }],
+    address: [{ type: mongoose.Schema.Types.ObjectId, ref: "UserShippingAddress" }],
     homeAddress: [{ type: mongoose.Schema.Types.ObjectId, ref: "UserHomeAddress" }],
     wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
     cart: [{ type: mongoose.Schema.Types.ObjectId, ref: "Cart" }],
