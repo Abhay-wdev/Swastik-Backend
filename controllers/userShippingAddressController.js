@@ -38,8 +38,7 @@ export const createShippingAddress = async (req, res) => {
 
     // ✅ Create new address with payment method
     const newAddress = new UserShippingAddress({
-      ...data,
-      paymentMethod: data.paymentMethod || "COD", // default fallback
+      ...data,      paymentMethod: data.paymentMethod || "COD", // default fallback
     });
 
     const savedAddress = await newAddress.save();

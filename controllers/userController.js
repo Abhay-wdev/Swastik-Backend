@@ -209,6 +209,7 @@ export const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         image: user.image,
+        shippingAddress: user.shippingAddress,
       },
       token,
       message: "Login successful",
