@@ -1,14 +1,5 @@
 import Contact from "../models/contactModel.js";
-import nodemailer from "nodemailer";
-
-// ✅ Configure transporter (same as OTP)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+import emailApi from "../config/brevo.js";
 
 // =============================
 // 📩 User submits contact form
@@ -17,18 +8,15 @@ export const createQuery = async (req, res) => {
   try {
     const { name, email, phone, message } = req.body;
 
-    // Validate required fields
     if (!name || !email || !phone || !message) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Optional: Validate Indian mobile format
     const phoneRegex = /^[6-9]\d{9}$/;
     if (!phoneRegex.test(phone)) {
       return res.status(400).json({ message: "Invalid phone number format" });
     }
 
-    // Create new contact query
     const newQuery = await Contact.create({ name, email, phone, message });
 
     res.status(201).json({
@@ -53,7 +41,7 @@ export const getAllQueries = async (req, res) => {
 };
 
 // =============================
-// 📤 Admin reply to a query
+// 📤 Admin reply to a query (with Brevo)
 // =============================
 export const replyToQuery = async (req, res) => {
   try {
@@ -69,29 +57,38 @@ export const replyToQuery = async (req, res) => {
       return res.status(404).json({ message: "Query not found" });
     }
 
-    // Send reply email to the user
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: query.email,
+    // Prepare email content
+    const emailData = {
+      sender: {
+        name: "Dadi Maa Laddoo Team",
+        email: process.env.BREVO_EMAIL, // configured sender email
+      },
+      to: [{ email: query.email, name: query.name }],
       subject: "Response from Dadi Maa Laddoo Team",
-      text: `Hello ${query.name},
+      htmlContent: `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <p>Dear <strong>${query.name}</strong>,</p>
+          <p>${reply}</p>
+          <p><strong>Contact Number:</strong> ${query.phone}</p>
+          <br/>
+          <p>Warm regards,</p>
+          <p><strong>Dadi Maa Laddoo Team</strong></p>
+        </div>
+      `,
+    };
 
-${reply}
-
-📞 Contact Number: ${query.phone}
-
-Regards,
-Dadi Maa Laddoo Team`,
-    });
+    // Send email using Brevo
+    await emailApi.sendTransacEmail(emailData);
 
     // Save reply info
     query.reply = reply;
-    query.repliedBy = req.user?._id || null; // optional if auth exists
+    query.repliedBy = req.user?._id || null;
     query.repliedAt = new Date();
     await query.save();
 
     res.status(200).json({ message: "Reply sent successfully", query });
   } catch (error) {
+    console.error("Brevo error:", error.message);
     res.status(500).json({ message: error.message });
   }
 };

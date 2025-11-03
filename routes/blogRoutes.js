@@ -29,17 +29,17 @@ router.get("/slug/:slug", getBlogBySlug);
 
 // Create a new blog with image upload
 router.post(
-  "/", multer.single("image"),createBlog
+  "/",protect, allowRoles("admin", "seller", "manager"), multer.single("image"),createBlog
 );
 
 // Update blog by ID
 router.put(
-  "/:id",multer.single("image"),updateBlog
+  "/:id",protect, allowRoles("admin", "seller", "manager"),multer.single("image"),updateBlog
 );
 
 // Delete blog by ID
 router.delete(
-  "/:id",deleteBlog
+  "/:id",protect, allowRoles("admin", "seller", "manager"),deleteBlog
 );
 
 export default router;

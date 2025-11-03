@@ -7,7 +7,8 @@ import {
   updateHeroImage,
   reorderHeroImages,
 } from "../controllers/heroImageController.js";
-
+import { protect } from "../middlewares/authMiddleware.js";
+import { allowRoles } from "../middlewares/roleMiddleware.js";
 const router = express.Router();
 
 // Enhanced middleware to handle file uploads with validation
@@ -48,10 +49,10 @@ const handleHeroImageUpload = (req, res, next) => {
 router.get("/", getHeroImages);
 
 // POST upload new hero image with validation
-router.post("/upload", handleHeroImageUpload, uploadHeroImages);
+router.post("/upload",protect, allowRoles("admin", "seller", "manager"), handleHeroImageUpload, uploadHeroImages);
 
 // PUT update hero image (with file upload support)
-router.put("/:id", (req, res, next) => {
+router.put("/:id",protect, allowRoles("admin", "seller", "manager"), (req, res, next) => {
   // Use same upload middleware for partial updates
   multerUpload.fields([
     { name: 'desktopImage', maxCount: 1 },
@@ -69,9 +70,9 @@ router.put("/:id", (req, res, next) => {
 }, updateHeroImage);
 
 // PUT reorder hero images
-router.put("/reorder", reorderHeroImages);
+router.put("/reorder",protect, allowRoles("admin", "seller", "manager"), reorderHeroImages);
 
 // DELETE hero image
-router.delete("/:id", deleteHeroImage);
+router.delete("/:id",protect, allowRoles("admin", "seller", "manager"), deleteHeroImage);
 
 export default router;

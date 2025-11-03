@@ -9,10 +9,12 @@ import {
   deleteUser,
   addToCart,
   addToWishlist,
-  logoutUser,       // logout controller
+  logoutUser,    
+  updateUserStatus,   // logout controller
 } from "../controllers/userController.js"; 
 import { protect } from "../middlewares/authMiddleware.js"; // JWT middleware
-
+ 
+import { allowRoles } from "../middlewares/roleMiddleware.js";
 const router = express.Router();
 
 // ---------------------------
@@ -26,10 +28,10 @@ const router = express.Router();
 router.post("/login", loginUser);
 
 // Logout user
-router.post("/logout", logoutUser);
+router.post("/logout",protect, logoutUser);
 
 // Get all users (admin only)
-router.get("/", protect, getAllUsers);
+router.get("/", getAllUsers);
 
 // Get a single user by ID
 router.get("/:userId", protect, getUserById);
@@ -39,11 +41,11 @@ router.put("/update/:userId", protect, upload.single("image"), updateUser);
 
 
 // Delete user by ID (admin only)
-router.delete("/:userId", protect, deleteUser);
+router.delete("/:userId", protect,allowRoles("admin", "seller", "manager"), deleteUser);
 
 // Add product to user's cart
 router.put("/:userId/cart", protect, addToCart);
-
+router.patch("/:userId/status",protect, allowRoles("admin", "seller", "manager"), updateUserStatus);
 // Add product to user's wishlist
 router.put("/:userId/wishlist", protect, addToWishlist);
 

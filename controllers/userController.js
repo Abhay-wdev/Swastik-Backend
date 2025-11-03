@@ -217,6 +217,50 @@ export const loginUser = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+export const updateUserStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { isActive } = req.body;
+
+    // Ensure both values exist
+    if (typeof isActive !== "boolean") {
+      return res
+        .status(400)
+        .json({ success: false, message: "isActive must be a boolean" });
+    }
+
+    // Fetch user first
+    const user = await UserModel.findById(userId);
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+
+    // Prevent an admin from deactivating themselves
+    // Assuming req.user contains the logged-in user's info (set by middleware)
+    if (req.user && req.user._id.toString() === userId && user.role === "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot deactivate your own admin account.",
+      });
+    }
+
+    // Update active status
+    user.isActive = isActive;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `User ${isActive ? "activated" : "deactivated"} successfully`,
+      user,
+    });
+  } catch (error) {
+    console.error("Error updating user status:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while updating status" });
+  }
+};
 
 // ===============================
 // LOGOUT USER
