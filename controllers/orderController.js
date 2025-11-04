@@ -2,14 +2,21 @@ import Order from "../models/orderModel.js";
 import Cart from "../models/cartModel.js";
 import UserShippingAddress from "../models/userShippingAddressModel.js";
 
-// -------------------- PLACE ORDER --------------------
+ 
+
 export const placeOrder = async (req, res) => {
   try {
     const { userId, addressId } = req.body;
 
+    // Validate request
+    if (!userId || !addressId) {
+      return res.status(400).json({ success: false, message: "User ID and Address ID are required" });
+    }
+
     // Validate address
     const address = await UserShippingAddress.findOne({ _id: addressId, user: userId });
     console.log("Placing order for user:", userId, "with address:", addressId);
+
     if (!address) {
       return res.status(404).json({ success: false, message: "Shipping address not found" });
     }
@@ -23,13 +30,13 @@ export const placeOrder = async (req, res) => {
     // Prepare order items
     const orderItems = cart.items.map((item) => ({
       product: item.product,
-      name: item.productSnapshot.name,
-      price: item.productSnapshot.price,
-      discountPrice: item.productSnapshot.discountPrice,
+      name: item.productSnapshot?.name || "Unknown Product",
+      price: item.productSnapshot?.price || 0,
+      discountPrice: item.productSnapshot?.discountPrice || 0,
       quantity: item.quantity,
       subtotal: item.subtotal,
       variant: item.variant,
-      image: item.productSnapshot.image,
+      image: item.productSnapshot?.image || "",
     }));
 
     // Create order
@@ -37,9 +44,9 @@ export const placeOrder = async (req, res) => {
       user: userId,
       items: orderItems,
       address: address._id,
-      totalPrice: cart.totalPrice,
-      discount: cart.discount,
-      grandTotal: cart.grandTotal,
+      totalPrice: cart.totalPrice || 0,
+      discount: cart.discount || 0,
+      grandTotal: cart.grandTotal || 0,
       paymentStatus: "pending",
       orderStatus: "processing",
     });
@@ -66,6 +73,7 @@ export const placeOrder = async (req, res) => {
     });
   }
 };
+
 
 // -------------------- GET ALL ORDERS (Admin) --------------------
 export const getAllOrders = async (req, res) => {

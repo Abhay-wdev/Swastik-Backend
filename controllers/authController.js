@@ -3,7 +3,7 @@ import UserModel from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import emailApi from "../config/brevo.js"; // ✅ Import configured Brevo client
-
+import { generateToken } from "../config/jwt.js";
 dotenv.config();
 
 let otpStore = {}; // Temporary in-memory OTP store
@@ -61,18 +61,33 @@ export const sendRegistrationOTP = async (req, res) => {
 // ================================
 // VERIFY OTP & REGISTER USER
 // ================================
+ 
+
 export const verifyOTPAndRegister = async (req, res) => {
   try {
     const { name, email, password, phone, otp } = req.body;
 
+    // 1️⃣ Validate OTP existence
     if (!otpStore[email])
       return res.status(400).json({ success: false, message: "OTP not found or expired" });
 
+    // 2️⃣ Validate OTP correctness
     if (otpStore[email] !== otp)
       return res.status(400).json({ success: false, message: "Invalid OTP" });
 
+    // 3️⃣ Check if user already exists
+    const existingUser = await UserModel.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "Email already registered. Please log in.",
+      });
+    }
+
+    // 4️⃣ Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // 5️⃣ Create user
     const user = await UserModel.create({
       name,
       email,
@@ -82,12 +97,24 @@ export const verifyOTPAndRegister = async (req, res) => {
       emailVerified: true,
     });
 
+    // 6️⃣ Generate JWT token
+    const token = generateToken(user._id);
+
+    // 7️⃣ Cleanup OTP
     delete otpStore[email];
 
+    // 8️⃣ Send success response
     return res.status(201).json({
       success: true,
       message: "Registration successful!",
-      user,
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+      },
     });
   } catch (error) {
     console.error("❌ Error verifying OTP and registering:", error);
@@ -98,6 +125,7 @@ export const verifyOTPAndRegister = async (req, res) => {
     });
   }
 };
+
 
 // ================================
 // FORGOT PASSWORD – SEND OTP
