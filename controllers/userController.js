@@ -108,17 +108,34 @@ export const updateUser = async (req, res) => {
 // ===============================
 // DELETE USER
 // ===============================
+
 export const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
+    const requesterId = req.user?._id; // assuming user info comes from auth middleware
 
+    // Validate ID
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: "Invalid user ID" });
+      return res.status(400).json({ success: false, message: "Invalid user ID" });
     }
 
-    const user = await UserModel.findByIdAndDelete(userId);
+    // Ensure only admin can perform deletion
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Access denied. Admins only." });
+    }
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    // Prevent admin from deleting their own account
+    if (requesterId.toString() === userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "You cannot delete your own account." });
+    }
+
+    // Proceed with deletion
+    const user = await UserModel.findByIdAndDelete(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
 
     res.status(200).json({ success: true, message: "User deleted successfully" });
   } catch (error) {
