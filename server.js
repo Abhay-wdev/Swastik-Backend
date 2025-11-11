@@ -26,7 +26,7 @@ import videoProductRoutes from "./routes/videoProductRoutes.js";
 import category from "./routes/category.js";
 import testimonialsRouter from "./routes/testimonialsRoutes.js";
 import distributorRoutes from "./routes/distributorRoutes.js";
-import subscriberRoutes from "./routes/subscriberRoutes.js"
+import userSubScriberRoutes from "./routes/userSubScriberRoutes.js"
 dotenv.config();
 
 const app = express();
@@ -62,7 +62,7 @@ app.use("/api/videoproducts", videoProductRoutes);
 app.use("/api/categoryCards", category);
 app.use("/api/testimonials", testimonialsRouter);
 app.use("/api/distributors", distributorRoutes);
-app.use("/api/subscribers", subscriberRoutes);
+app.use("/api/subscribers", userSubScriberRoutes );
 app.get("/", (req, res) => res.send("API is running"));
 
 const PORT = process.env.PORT || 5000;
