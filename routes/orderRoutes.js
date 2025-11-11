@@ -17,7 +17,7 @@ const router = express.Router();
 router.post("/place-order",protect, placeOrder);
 
 // 🟡 Get all orders (Admin)
-router.get("/", protect, allowRoles("admin", "seller", "manager") , getAllOrders);
+router.get("/" , getAllOrders);
 
 // 🟠 Get user orders
 router.get("/user/:userId", protect, getUserOrders);
@@ -32,6 +32,6 @@ router.put("/:orderId", protect, allowRoles("admin", "seller", "manager"), updat
 router.delete("/:orderId",protect, allowRoles("admin", "seller", "manager"), deleteOrder);
 
 // 📄 Generate PDF invoice
-router.get("/invoice/:orderId",   generateInvoice);
+router.get("/invoice/:orderId",protect,   generateInvoice);
 
 export default router;
