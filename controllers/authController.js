@@ -107,7 +107,7 @@ export const verifyOTPAndRegister = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Registration successful!",
-      token,
+      
       user: {
         _id: user._id,
         name: user.name,
