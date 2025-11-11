@@ -67,27 +67,53 @@ export const verifyOTPAndRegister = async (req, res) => {
   try {
     const { name, email, password, phone, otp } = req.body;
 
-    // 1️⃣ Validate OTP existence
-    if (!otpStore[email])
-      return res.status(400).json({ success: false, message: "OTP not found or expired" });
+    // 🧩 1️⃣ Validate required fields
+    if (!email || !otp || !password || !name || !phone) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required.",
+      });
+    }
 
-    // 2️⃣ Validate OTP correctness
-    if (otpStore[email] !== otp)
-      return res.status(400).json({ success: false, message: "Invalid OTP" });
+    // 🧩 2️⃣ Validate OTP existence
+    const storedOtp = otpStore[email];
+    if (!storedOtp) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired or not found. Please request a new one.",
+      });
+    }
 
-    // 3️⃣ Check if user already exists
+    // 🧩 3️⃣ Validate OTP correctness (handle string vs number)
+    if (storedOtp.toString().trim() !== otp.toString().trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP. Please check and try again.",
+      });
+    }
+
+    // 🧩 4️⃣ Check existing email
     const existingUser = await UserModel.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: "Email already registered. Please log in.",
+        message: "Email already registered. Please log in with another email.",
       });
     }
 
-    // 4️⃣ Hash password
+    // 🧩 5️⃣ Check existing phone number
+    const existingUserMobile = await UserModel.findOne({ phone });
+    if (existingUserMobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile number already registered. Please use another number.",
+      });
+    }
+
+    // 🧩 6️⃣ Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 5️⃣ Create user
+    // 🧩 7️⃣ Create user
     const user = await UserModel.create({
       name,
       email,
@@ -97,17 +123,16 @@ export const verifyOTPAndRegister = async (req, res) => {
       emailVerified: true,
     });
 
-    // 6️⃣ Generate JWT token
-    const token = generateToken(user._id);
+   
 
-    // 7️⃣ Cleanup OTP
+    // 🧩 9️⃣ Cleanup OTP (only after success)
     delete otpStore[email];
 
-    // 8️⃣ Send success response
+    // 🧩 🔟 Send success response
     return res.status(201).json({
       success: true,
       message: "Registration successful!",
-      
+       
       user: {
         _id: user._id,
         name: user.name,
@@ -120,11 +145,12 @@ export const verifyOTPAndRegister = async (req, res) => {
     console.error("❌ Error verifying OTP and registering:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to register user.",
+      message: "Failed to verify OTP or register user. Please try again.",
       error: error.message,
     });
   }
 };
+
 
 
 // ================================
