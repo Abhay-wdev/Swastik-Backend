@@ -228,31 +228,77 @@ export const updateProduct = async (req, res) => {
     const imageSequence = parseJSON(req.body.imageSequence) || [];
 
     let updatedImages = [...(product.images || [])];
+
+    // =====================================================
+    // 🔥 FIXED: Correct Cloudinary Public ID Extraction
+    // =====================================================
+    const extractPublicId = (url) => {
+      const noParams = url.split("?")[0]; // remove ? queries
+      const afterUpload = noParams.split("/upload/")[1];
+      if (!afterUpload) return null;
+
+      const parts = afterUpload.split("/");
+
+      // Remove version folder (v123, v1763024782, etc.)
+      if (parts[0].startsWith("v")) {
+        parts.shift();
+      }
+
+      // The remaining is folder + filename.ext → e.g. products/abc.webp
+      const filePath = parts.join("/");
+
+      // Remove extension (.jpg, .png, .webp)
+      return filePath.replace(/\.[^/.]+$/, "");
+    };
+
+    // =====================================================
+    // DELETE SELECTED IMAGES FROM CLOUDINARY
+    // =====================================================
     for (const url of imagesToRemove) {
       try {
-        const parts = url.split("/");
-        const publicIdWithExt = parts.slice(-2).join("/");
-        const publicId = publicIdWithExt.split(".")[0];
-        await cloudinary.uploader.destroy(publicId);
-      } catch (err) { console.error("Cloudinary delete error:", err); }
+        const publicId = extractPublicId(url);
+        console.log("Deleting publicId:", publicId);
+
+        if (publicId) {
+          const result = await cloudinary.uploader.destroy(publicId);
+          console.log("Cloudinary delete result:", result);
+        } else {
+          console.log("❌ Could NOT extract publicId for:", url);
+        }
+      } catch (error) {
+        console.error("Cloudinary delete error:", error);
+      }
     }
+
     updatedImages = updatedImages.filter(url => !imagesToRemove.includes(url));
 
+    // =====================================================
+    // UPLOAD NEW IMAGES
+    // =====================================================
     let newImageUrls = [];
     if (req.files?.length > 0) {
       const uploads = await Promise.all(
-        req.files.map(file => cloudinary.uploader.upload(file.path, { folder: "products" }))
+        req.files.map(file =>
+          cloudinary.uploader.upload(file.path, { folder: "products" })
+        )
       );
       newImageUrls = uploads.map(u => u.secure_url);
     }
+
     updatedImages = [...updatedImages, ...newImageUrls];
 
+    // =====================================================
+    // Maintain custom image order
+    // =====================================================
     if (imageSequence.length > 0) {
       const validSequence = imageSequence.filter(url => updatedImages.includes(url));
       const missing = updatedImages.filter(url => !validSequence.includes(url));
       updatedImages = [...validSequence, ...missing];
     }
 
+    // =====================================================
+    // UPDATE FIELDS
+    // =====================================================
     const fieldsToUpdate = {
       name: req.body.name || product.name,
       slug: req.body.name ? slugify(req.body.name, { lower: true }) : product.slug,
@@ -268,8 +314,6 @@ export const updateProduct = async (req, res) => {
       allergenInfo: req.body.allergenInfo || product.allergenInfo,
       nutritionalInfo: parseJSON(req.body.nutritionalInfo) || product.nutritionalInfo,
       weight: req.body.weight || product.weight,
-
-          
       priorityNumber: req.body.priorityNumber !== undefined ? req.body.priorityNumber : product.priorityNumber,
       discount: req.body.discount !== undefined ? req.body.discount : product.discount,
       images: updatedImages,
@@ -284,16 +328,20 @@ export const updateProduct = async (req, res) => {
     };
 
     Object.assign(product, fieldsToUpdate);
+
+    // Save & populate
     const updated = await product.save();
     await updated.populate("category", "name");
     await updated.populate("subCategory", "name");
 
     res.status(200).json(updated);
+
   } catch (error) {
     console.error("Update Product Error:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 // ================================
 // DELETE PRODUCT
 // ================================

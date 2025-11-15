@@ -3,7 +3,11 @@ import Category from "../models/categoryModel.js";
 import { v4 as uuidv4 } from "uuid";
 import slugify from "slugify";
 import cloudinary from "../config/cloudinary.js";
-
+import Product from "../models/productModel.js";
+import {
+  deleteMultipleCloudinaryImages,
+  deleteCloudinaryImage
+} from "../utils/cloudinaryHelper.js";
 // ================================
 // CREATE SUBCATEGORY
 // ================================
@@ -102,6 +106,10 @@ export const getSubCategoriesByCategoryId = async (req, res) => {
 // ================================
 // UPDATE SUBCATEGORY
 // ================================
+
+// ================================
+// UPDATE SUBCATEGORY
+// ================================
 export const updateSubCategory = async (req, res) => {
   try {
     const { name, category, description, isActive } = req.body;
@@ -110,52 +118,103 @@ export const updateSubCategory = async (req, res) => {
     if (!subCategory)
       return res.status(404).json({ message: "SubCategory not found" });
 
-    // Update name and slug
+    // Update name & slug
     if (name) {
       subCategory.name = name;
       subCategory.slug = slugify(name, { lower: true });
     }
 
-    // Update parent category if provided
+    // Update parent category
     if (category) {
       const parentCategory = await Category.findById(category);
-      if (!parentCategory)
+      if (!parentCategory) {
         return res.status(404).json({ message: "Parent Category not found" });
+      }
       subCategory.category = category;
     }
 
     if (description !== undefined) subCategory.description = description;
     if (isActive !== undefined) subCategory.isActive = isActive;
 
-    // Update image if provided
+    // =========================================
+    // 🔥 UPDATE IMAGE (Delete old → Upload new)
+    // =========================================
     if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
+      // Delete old image if exists
+      if (subCategory.image) {
+        await deleteCloudinaryImage(subCategory.image);
+      }
+
+      // Upload new image
+      const upload = await cloudinary.uploader.upload(req.file.path, {
         folder: "subcategories",
       });
-      subCategory.image = result.secure_url;
+
+      subCategory.image = upload.secure_url;
     }
 
     const updatedSubCategory = await subCategory.save();
     res.status(200).json(updatedSubCategory);
+
   } catch (error) {
+    console.error("Update SubCategory Error:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // ================================
 // DELETE SUBCATEGORY
 // ================================
 export const deleteSubCategory = async (req, res) => {
   try {
-    const deletedSubCategory = await SubCategory.findByIdAndDelete(req.params.id);
-    if (!deletedSubCategory)
+    const subCategory = await SubCategory.findById(req.params.id);
+
+    if (!subCategory)
       return res.status(404).json({ message: "SubCategory not found" });
 
-    res.status(200).json({ message: "SubCategory deleted successfully" });
+    // ============================================
+    // 1️⃣ DELETE ALL PRODUCTS UNDER THIS SUBCATEGORY
+    // ============================================
+    const products = await Product.find({ subCategory: req.params.id });
+
+    if (products.length > 0) {
+      console.log(`Deleting ${products.length} related products...`);
+
+      for (const product of products) {
+        // Delete Cloudinary images for each product
+        if (product.images?.length > 0) {
+          await deleteMultipleCloudinaryImages(product.images);
+        }
+
+        // Delete product from database
+        await Product.findByIdAndDelete(product._id);
+      }
+    }
+
+    // ============================================
+    // 2️⃣ DELETE SUBCATEGORY IMAGE FROM CLOUDINARY
+    // ============================================
+    if (subCategory.image) {
+      await deleteCloudinaryImage(subCategory.image);
+    }
+
+    // ============================================
+    // 3️⃣ DELETE THE SUBCATEGORY FROM DB
+    // ============================================
+    await SubCategory.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      success: true,
+      message: "SubCategory and all related products deleted successfully",
+    });
+
   } catch (error) {
+    console.error("Delete SubCategory Error:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // ================================
 // GET SUBCATEGORIES BY CATEGORY SLUG

@@ -1,13 +1,17 @@
 import fs from "fs";
 import cloudinary from "../config/cloudinary.js";
-import CategoryCard from "../models/category.js"; // ✅ Model name fixed
+import CategoryCard from "../models/category.js";
+import { deleteCloudinaryImage } from "../utils/cloudinaryHelper.js"; // helper to remove images from Cloudinary
 
 // Helper to safely remove temp file
 const safeUnlink = (p) => {
   if (!p) return;
   try {
-    fs.unlinkSync(p);
-  } catch {}
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  } catch (err) {
+    // ignore silently but log for debug
+    console.log("⚠️ safeUnlink error:", err.message);
+  }
 };
 
 // CREATE
@@ -38,7 +42,6 @@ export const createCategoryCard = async (req, res) => {
       return res.status(400).json({ message: "Image is required." });
     }
 
-    // ✅ Create a new document
     const newCategory = await CategoryCard.create({
       name,
       description,
@@ -100,7 +103,7 @@ export const getCategoryCardById = async (req, res) => {
   }
 };
 
-// UPDATE (image optional)
+// UPDATE (image optional; replace old Cloudinary image if present)
 export const updateCategoryCard = async (req, res) => {
   const { name, description, slug, link } = req.body;
 
@@ -128,6 +131,16 @@ export const updateCategoryCard = async (req, res) => {
     };
 
     if (req.file?.path) {
+      // delete old Cloudinary image if exists
+      if (current.image) {
+        try {
+          await deleteCloudinaryImage(current.image);
+        } catch (err) {
+          console.log("⚠️ Failed to delete old category image:", err.message);
+        }
+      }
+
+      // upload new image
       const upload = await cloudinary.uploader.upload(req.file.path, {
         folder: "categories",
         resource_type: "image",
@@ -139,7 +152,7 @@ export const updateCategoryCard = async (req, res) => {
     const updated = await CategoryCard.findByIdAndUpdate(
       req.params.id,
       updates,
-      { new: true }
+      { new: true, runValidators: true }
     );
 
     return res.json({
@@ -152,12 +165,22 @@ export const updateCategoryCard = async (req, res) => {
   }
 };
 
-// DELETE
+// DELETE (also remove Cloudinary image)
 export const deleteCategoryCard = async (req, res) => {
   try {
     const deleted = await CategoryCard.findByIdAndDelete(req.params.id);
     if (!deleted)
       return res.status(404).json({ message: "Category not found" });
+
+    // delete cloudinary image if present
+    if (deleted.image) {
+      try {
+        await deleteCloudinaryImage(deleted.image);
+      } catch (err) {
+        console.log("⚠️ Failed to delete category image from Cloudinary:", err.message);
+      }
+    }
+
     return res.json({ message: "Category deleted successfully" });
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: err.message });

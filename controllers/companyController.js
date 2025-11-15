@@ -1,16 +1,14 @@
 import Company from "../models/companyModal.js";
 import cloudinary from "../config/cloudinary.js";
 import fs from "fs";
-
-// ==================================================
-// CREATE OR UPDATE COMPANY
-// ==================================================
-
+import {
+  deleteCloudinaryImage,
+} from "../utils/cloudinaryHelper.js";
 export const createOrUpdateCompany = async (req, res) => {
   try {
     let data = { ...req.body };
 
-    // Helper: safely parse JSON values
+    // Parse JSON fields
     const parseIfJSON = (v) => {
       try {
         return typeof v === "string" ? JSON.parse(v) : v;
@@ -23,7 +21,7 @@ export const createOrUpdateCompany = async (req, res) => {
     data.directors = parseIfJSON(data.directors);
     data.socialLinks = parseIfJSON(data.socialLinks);
 
-    // ✅ Email validation
+    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (data.email && !emailRegex.test(data.email)) {
       return res.status(400).json({
@@ -32,48 +30,61 @@ export const createOrUpdateCompany = async (req, res) => {
       });
     }
 
-    // Handle file uploads
+    // Load existing company for reference (for image delete)
+    let existingCompany = await Company.findOne();
+
+    // Clone social links to modify safely
     const updatedSocialLinks = [...(data.socialLinks || [])];
-    
-    // ✅ Check if files exist before processing
+
+    // ==========================================================
+    // 🔥 HANDLE FILE UPLOADS + AUTO DELETE OLD CLOUDINARY IMAGES
+    // ==========================================================
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
         try {
+          // ----------------------------------------------------
+          // 1️⃣ Company Logo Update (Replace old logo)
+          // ----------------------------------------------------
           if (file.fieldname === "logo") {
-            // Upload company logo
-            const result = await cloudinary.uploader.upload(file.path, {
+            if (existingCompany?.logo) {
+              await deleteCloudinaryImage(existingCompany.logo);
+            }
+
+            const upload = await cloudinary.uploader.upload(file.path, {
               folder: "company_logos",
             });
-            data.logo = result.secure_url;
-            
-            // Clean up temp file
-            if (fs.existsSync(file.path)) {
-              fs.unlinkSync(file.path);
-            }
-          } else if (file.fieldname.startsWith("socialIcon_")) {
-            // Upload dynamic social icons
+
+            data.logo = upload.secure_url;
+          }
+
+          // ----------------------------------------------------
+          // 2️⃣ Social Icons dynamic replacement: socialIcon_0, socialIcon_1 ...
+          // ----------------------------------------------------
+          else if (file.fieldname.startsWith("socialIcon_")) {
             const index = parseInt(file.fieldname.split("_")[1]);
-            
-            // ✅ Ensure index is valid
-            if (!isNaN(index) && index >= 0 && index < updatedSocialLinks.length) {
-              const result = await cloudinary.uploader.upload(file.path, {
+
+            if (!isNaN(index)) {
+              const oldIcon = existingCompany?.socialLinks?.[index]?.logoimage;
+
+              if (oldIcon) {
+                await deleteCloudinaryImage(oldIcon);
+              }
+
+              const upload = await cloudinary.uploader.upload(file.path, {
                 folder: "company_social_icons",
               });
-              
-              if (!updatedSocialLinks[index]) {
-                updatedSocialLinks[index] = {};
-              }
-              updatedSocialLinks[index].logoimage = result.secure_url;
-              
-              // Clean up temp file
-              if (fs.existsSync(file.path)) {
-                fs.unlinkSync(file.path);
-              }
+
+              if (!updatedSocialLinks[index]) updatedSocialLinks[index] = {};
+              updatedSocialLinks[index].logoimage = upload.secure_url;
             }
           }
-        } catch (uploadError) {
-          console.error("❌ File upload error:", uploadError);
-          // Clean up temp file on error
+
+          // Delete temporary upload file
+          if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+
+        } catch (err) {
+          console.error("❌ Upload error:", err);
+
           if (file.path && fs.existsSync(file.path)) {
             fs.unlinkSync(file.path);
           }
@@ -83,7 +94,9 @@ export const createOrUpdateCompany = async (req, res) => {
 
     data.socialLinks = updatedSocialLinks;
 
-    // ✅ Required field validation
+    // ==========================================================
+    // REQUIRED FIELD VALIDATION
+    // ==========================================================
     const requiredFields = [
       "name",
       "email",
@@ -99,7 +112,8 @@ export const createOrUpdateCompany = async (req, res) => {
       const parts = field.split(".");
       const value =
         parts.length > 1 ? data[parts[0]]?.[parts[1]] : data[parts[0]];
-      if (!value || (typeof value === 'string' && value.trim() === '')) {
+
+      if (!value || (typeof value === "string" && value.trim() === "")) {
         return res.status(400).json({
           success: false,
           message: `Missing required field: ${field}`,
@@ -107,25 +121,29 @@ export const createOrUpdateCompany = async (req, res) => {
       }
     }
 
-    // ✅ Validate directors array
+    // Directors validation
     if (data.directors && Array.isArray(data.directors)) {
-      data.directors = data.directors.filter(dir => dir.name && dir.name.trim() !== '');
+      data.directors = data.directors.filter((d) => d.name?.trim());
     }
 
-    // ✅ Validate social links array
+    // Social links validation
     if (data.socialLinks && Array.isArray(data.socialLinks)) {
       data.socialLinks = data.socialLinks.filter(
-        link => link.social || link.link || link.logoimage
+        (s) => s.social || s.link || s.logoimage
       );
     }
 
-    // ✅ Allow only one company entry
+    // ==========================================================
+    // CREATE OR UPDATE COMPANY IN DB
+    // ==========================================================
     let company = await Company.findOne();
+
     if (company) {
       company = await Company.findByIdAndUpdate(company._id, data, {
         new: true,
         runValidators: true,
       });
+
       return res.status(200).json({
         success: true,
         message: "Company details updated successfully",
@@ -143,18 +161,19 @@ export const createOrUpdateCompany = async (req, res) => {
       message: "Company created successfully",
       company: newCompany,
     });
+
   } catch (error) {
     console.error("❌ Company create/update error:", error);
-    
-    // ✅ Clean up any temp files on error
-    if (req.files && req.files.length > 0) {
-      req.files.forEach(file => {
+
+    // Cleanup temp files on error
+    if (req.files) {
+      req.files.forEach((file) => {
         if (file.path && fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: "Failed to create or update company",
@@ -162,7 +181,6 @@ export const createOrUpdateCompany = async (req, res) => {
     });
   }
 };
-
 // ==================================================
 // GET ALL COMPANIES
 // ==================================================

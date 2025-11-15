@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import UserModel from "../models/userModel.js"; // adjust path
 import bcrypt from "bcryptjs";
 import cloudinary from "../config/cloudinary.js";
-
+import { deleteCloudinaryImage } from "../utils/cloudinaryHelper.js";
 
  
  
@@ -66,6 +66,7 @@ export const getUserById = async (req, res) => {
 // ===============================
 // UPDATE USER
 // ===============================
+
 export const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -74,14 +75,27 @@ export const updateUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
+    const existingUser = await UserModel.findById(userId);
+    if (!existingUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     let updateData = { ...req.body };
 
-    // Upload image to Cloudinary if file is present
+    // ================================
+    // 🔥 DELETE OLD IMAGE IF NEW UPLOADED
+    // ================================
     if (req.file) {
+      // Remove old image from Cloudinary
+      if (existingUser.image) {
+        await deleteCloudinaryImage(existingUser.image);
+      }
+
+      // Upload new image
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: "users",
       });
-      updateData.image = result.secure_url; // Save Cloudinary URL
+      updateData.image = result.secure_url;
     }
 
     // Hash password if updated
@@ -95,53 +109,63 @@ export const updateUser = async (req, res) => {
       { new: true }
     ).select("-password");
 
-    if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
     res.status(200).json({ success: true, user: updatedUser });
+
   } catch (error) {
+    console.error("Update User Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // ===============================
 // DELETE USER
 // ===============================
-
 export const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const requesterId = req.user?._id; // assuming user info comes from auth middleware
+    const requesterId = req.user?._id;
 
-    // Validate ID
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Invalid user ID" });
     }
 
-    // Ensure only admin can perform deletion
     if (req.user.role !== "admin") {
       return res.status(403).json({ success: false, message: "Access denied. Admins only." });
     }
 
-    // Prevent admin from deleting their own account
     if (requesterId.toString() === userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "You cannot delete your own account." });
+      return res.status(400).json({
+        success: false,
+        message: "You cannot delete your own account.",
+      });
     }
 
-    // Proceed with deletion
-    const user = await UserModel.findByIdAndDelete(userId);
+    const user = await UserModel.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    res.status(200).json({ success: true, message: "User deleted successfully" });
+    // ================================
+    // 🔥 DELETE CLOUDINARY IMAGE
+    // ================================
+    if (user.image) {
+      await deleteCloudinaryImage(user.image);
+    }
+
+    await UserModel.findByIdAndDelete(userId);
+
+    res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+    });
+
   } catch (error) {
+    console.error("Delete User Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // ===============================
 // ADD TO CART

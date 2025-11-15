@@ -60,11 +60,11 @@ export const replyToQuery = async (req, res) => {
     // Prepare email content
     const emailData = {
       sender: {
-        name: "Dadi Maa Laddoo Team",
+        name: "suswastik Team",
         email: process.env.BREVO_EMAIL, // configured sender email
       },
       to: [{ email: query.email, name: query.name }],
-      subject: "Response from Dadi Maa Laddoo Team",
+      subject: "Response from suswastik Team",
       htmlContent: `
         <div style="font-family: Arial, sans-serif; color: #333;">
           <p>Dear <strong>${query.name}</strong>,</p>
@@ -72,7 +72,7 @@ export const replyToQuery = async (req, res) => {
           <p><strong>Contact Number:</strong> ${query.phone}</p>
           <br/>
           <p>Warm regards,</p>
-          <p><strong>Dadi Maa Laddoo Team</strong></p>
+          <p><strong>suswastik Team</strong></p>
         </div>
       `,
     };

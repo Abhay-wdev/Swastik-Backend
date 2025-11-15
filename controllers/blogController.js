@@ -1,6 +1,10 @@
 import Blog from "../models/blogModel.js";
 import cloudinary from "../config/cloudinary.js";
 import fs from "fs";
+import {
+  deleteCloudinaryImage
+} from "../utils/cloudinaryHelper.js";
+
 // ========================
 // 🟢 Create Blog
 // ========================
@@ -99,6 +103,7 @@ export const getBlogBySlug = async (req, res) => {
 // 🔵 Update Blog
 // ========================
 // ✅ Update Blog Controller
+
 export const updateBlog = async (req, res) => {
   try {
     const { id } = req.params;
@@ -111,24 +116,22 @@ export const updateBlog = async (req, res) => {
 
     const { title, author, category, tags, htmlContent, isPublished } = req.body;
 
-    // 🧠 Handle content safely
+    // 🧠 Parse content safely
     let content = req.body.content;
     if (typeof content === "string") {
       try {
         content = JSON.parse(content);
       } catch {
-        content = blog.content; // fallback
+        content = blog.content;
       }
     }
 
-    // 🧩 Prepare update fields
+    // Prepare update data
     const updateData = {
       title: title || blog.title,
       author: author || blog.author,
       category: category || blog.category,
-      tags: tags
-        ? tags.split(",").map((t) => t.trim())
-        : blog.tags,
+      tags: tags ? tags.split(",").map((t) => t.trim()) : blog.tags,
       htmlContent: htmlContent || blog.htmlContent,
       content,
       isPublished:
@@ -139,32 +142,24 @@ export const updateBlog = async (req, res) => {
           : blog.isPublished,
     };
 
-    // 🖼️ If a new image is uploaded
+    // =====================================================
+    // 🔥 IMAGE REPLACEMENT USING HELPER
+    // =====================================================
     if (req.file) {
-      // 1️⃣ Delete old image from Cloudinary
+      // Delete old Cloudinary image if exists
       if (blog.image) {
-        try {
-          // Extract public ID (handle both folder & direct URLs)
-          const parts = blog.image.split("/");
-          const publicIdWithExt = parts[parts.length - 1];
-          const publicId = "blogs/" + publicIdWithExt.split(".")[0];
-
-          await cloudinary.uploader.destroy(publicId);
-        } catch (err) {
-          console.warn("⚠️ Error deleting old image:", err.message);
-        }
+        await deleteCloudinaryImage(blog.image);
       }
 
-      // 2️⃣ Upload new image
-      const result = await cloudinary.uploader.upload(req.file.path, {
+      // Upload new image
+      const uploaded = await cloudinary.uploader.upload(req.file.path, {
         folder: "blogs",
       });
 
-      // 3️⃣ Assign new image URL
-      updateData.image = result.secure_url;
+      updateData.image = uploaded.secure_url;
 
-      // 4️⃣ Clean up local file (optional)
-      fs.unlinkSync(req.file.path);
+      // Remove temp file
+      fs.existsSync(req.file.path) && fs.unlinkSync(req.file.path);
     }
 
     // 🧩 Update slug if title changed
@@ -176,7 +171,7 @@ export const updateBlog = async (req, res) => {
         .replace(/^-+|-+$/g, "");
     }
 
-    // ✅ Update blog
+    // Update blog
     const updatedBlog = await Blog.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
@@ -187,6 +182,7 @@ export const updateBlog = async (req, res) => {
       message: "Blog updated successfully",
       data: updatedBlog,
     });
+
   } catch (error) {
     console.error("Update Blog Error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -200,21 +196,25 @@ export const updateBlog = async (req, res) => {
 export const deleteBlog = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
+
     if (!blog)
       return res.status(404).json({ success: false, message: "Blog not found" });
 
-    // Delete associated image
+    // Delete associated Cloudinary image
     if (blog.image) {
-      const publicId = blog.image.split("/").pop().split(".")[0];
-      await cloudinary.uploader.destroy(`blogs/${publicId}`);
+      await deleteCloudinaryImage(blog.image);
     }
 
     await blog.deleteOne();
+
     res.json({
       success: true,
       message: "🗑️ Blog deleted successfully",
     });
+
   } catch (error) {
+    console.error("Delete Blog Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
