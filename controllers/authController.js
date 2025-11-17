@@ -30,7 +30,7 @@ export const sendRegistrationOTP = async (req, res) => {
       subject: "Your Registration OTP Code",
       htmlContent: `
         <div style="font-family:Arial,sans-serif;padding:20px;border:1px solid #eee;border-radius:8px;max-width:500px;margin:auto;">
-          <h2 style="color:#4a90e2;">Welcome to ${process.env.APP_NAME}!</h2>
+          <h2 style="color:#4a90e2;">Welcome to Suswastik!</h2>
           <p>Your One-Time Password (OTP) for registration is:</p>
           <h1 style="color:#4a90e2;letter-spacing:6px;">${otp}</h1>
           <p>This OTP will expire in <b>5 minutes</b>.</p>
