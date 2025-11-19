@@ -8,7 +8,7 @@ export const placeOrder = async (req, res) => {
   try {
     const { userId, addressId } = req.body;
 
-    // Validate request
+    // Validate 
     if (!userId || !addressId) {
       return res.status(400).json({ success: false, message: "User ID and Address ID are required" });
     }
