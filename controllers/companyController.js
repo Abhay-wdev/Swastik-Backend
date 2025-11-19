@@ -4,6 +4,7 @@ import fs from "fs";
 import {
   deleteCloudinaryImage,
 } from "../utils/cloudinaryHelper.js";
+
 export const createOrUpdateCompany = async (req, res) => {
   try {
     let data = { ...req.body };
@@ -20,6 +21,44 @@ export const createOrUpdateCompany = async (req, res) => {
     data.address = parseIfJSON(data.address);
     data.directors = parseIfJSON(data.directors);
     data.socialLinks = parseIfJSON(data.socialLinks);
+    
+    // Handle deliveryCharge field
+    if (data.deliveryCharge !== undefined) {
+      // Convert to number if it's a string
+      if (typeof data.deliveryCharge === 'string') {
+        data.deliveryCharge = parseFloat(data.deliveryCharge);
+      }
+      
+      // Validate it's a number and non-negative
+      if (isNaN(data.deliveryCharge) || data.deliveryCharge < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Delivery charge must be a non-negative number",
+        });
+      }
+    } else {
+      // Set default value if not provided
+      data.deliveryCharge = 0;
+    }
+    
+    // Handle freeDeliveryUpto field
+    if (data.freeDeliveryUpto !== undefined) {
+      // Convert to number if it's a string
+      if (typeof data.freeDeliveryUpto === 'string') {
+        data.freeDeliveryUpto = parseFloat(data.freeDeliveryUpto);
+      }
+      
+      // Validate it's a number and non-negative
+      if (isNaN(data.freeDeliveryUpto) || data.freeDeliveryUpto < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Free delivery threshold must be a non-negative number",
+        });
+      }
+    } else {
+      // Set default value if not provided
+      data.freeDeliveryUpto = 0;
+    }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -181,6 +220,7 @@ export const createOrUpdateCompany = async (req, res) => {
     });
   }
 };
+
 // ==================================================
 // GET ALL COMPANIES
 // ==================================================
@@ -269,6 +309,118 @@ export const deleteCompany = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to delete company",
+      error: error.message,
+    });
+  }
+};
+
+// ==================================================
+// UPDATE DELIVERY CHARGE
+// ==================================================
+export const updateDeliveryCharge = async (req, res) => {
+  try {
+    const { deliveryCharge } = req.body;
+    
+    // Validate delivery charge
+    if (deliveryCharge === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Delivery charge is required",
+      });
+    }
+    
+    // Convert to number if it's a string
+    let charge = deliveryCharge;
+    if (typeof charge === 'string') {
+      charge = parseFloat(charge);
+    }
+    
+    // Validate it's a number and non-negative
+    if (isNaN(charge) || charge < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Delivery charge must be a non-negative number",
+      });
+    }
+    
+    // Find and update company
+    const company = await Company.findOne();
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
+    }
+    
+    company.deliveryCharge = charge;
+    await company.save();
+    
+    res.status(200).json({
+      success: true,
+      message: "Delivery charge updated successfully",
+      deliveryCharge: company.deliveryCharge,
+    });
+  } catch (error) {
+    console.error("❌ Update delivery charge error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update delivery charge",
+      error: error.message,
+    });
+  }
+};
+
+// ==================================================
+// UPDATE FREE DELIVERY THRESHOLD
+// ==================================================
+export const updateFreeDeliveryThreshold = async (req, res) => {
+  try {
+    const { freeDeliveryUpto } = req.body;
+    
+    // Validate free delivery threshold
+    if (freeDeliveryUpto === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Free delivery threshold is required",
+      });
+    }
+    
+    // Convert to number if it's a string
+    let threshold = freeDeliveryUpto;
+    if (typeof threshold === 'string') {
+      threshold = parseFloat(threshold);
+    }
+    
+    // Validate it's a number and non-negative
+    if (isNaN(threshold) || threshold < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Free delivery threshold must be a non-negative number",
+      });
+    }
+    
+    // Find and update company
+    const company = await Company.findOne();
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
+    }
+    
+    company.freeDeliveryUpto = threshold;
+    await company.save();
+    
+    res.status(200).json({
+      success: true,
+      message: "Free delivery threshold updated successfully",
+      freeDeliveryUpto: company.freeDeliveryUpto,
+    });
+  } catch (error) {
+    console.error("❌ Update free delivery threshold error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update free delivery threshold",
       error: error.message,
     });
   }

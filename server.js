@@ -39,30 +39,30 @@ app.use(express.json());
 connectDB();
 
 // Routes
-app.use("/api/products", productRoutes);
-app.use("/api/categories", categoryRoutes);           // <-- add categories
-app.use("/api/subcategories", subCategoryRoutes);     // <-- add subcategories
-app.use("/api/user", userRoutes);
-app.use("/api/reviews", reviewRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/coupons", couponRoutes);
-app.use("/api/shippingaddress",userShippingAddress); 
-app.use("/api/homeaddress",userHomeAddress); 
-app.use("/api/order-item", orderItemRoutes);
-app.use("/api/return", returnRoutes);
-app.use("/api/order-history", orderHistoryRoutes);
-app.use("/api/cart", cartRoutes);
-app.use("/api/payment-attempt", paymentAttemptRoutes);
-app.use("/api/hero", heroImageRoutes);
-app.use("/api/auth", auth);
-app.use("/api/blogs", blogRoutes);
-app.use("/api/company", companyRoutes);
-app.use("/api/contact", contactRoutes);
-app.use("/api/videoproducts", videoProductRoutes);
-app.use("/api/categoryCards", category);
-app.use("/api/testimonials", testimonialsRouter);
-app.use("/api/distributors", distributorRoutes);
-app.use("/api/subscribers", userSubScriberRoutes );
+app.use("/products", productRoutes);
+app.use("/categories", categoryRoutes);           // <-- add categories
+app.use("/subcategories", subCategoryRoutes);     // <-- add subcategories
+app.use("/user", userRoutes);
+app.use("/reviews", reviewRoutes);
+app.use("/orders", orderRoutes);
+app.use("/coupons", couponRoutes);
+app.use("/shippingaddress",userShippingAddress); 
+app.use("/homeaddress",userHomeAddress); 
+app.use("/order-item", orderItemRoutes);
+app.use("/return", returnRoutes);
+app.use("/order-history", orderHistoryRoutes);
+app.use("/cart", cartRoutes);
+app.use("/payment-attempt", paymentAttemptRoutes);
+app.use("/hero", heroImageRoutes);
+app.use("/auth", auth);
+app.use("/blogs", blogRoutes);
+app.use("/company", companyRoutes);
+app.use("/contact", contactRoutes);
+app.use("/videoproducts", videoProductRoutes);
+app.use("/categoryCards", category);
+app.use("/testimonials", testimonialsRouter);
+app.use("/distributors", distributorRoutes);
+app.use("/subscribers", userSubScriberRoutes );
 app.get("/", (req, res) => res.send("API is running"));
 
 const PORT = process.env.PORT || 5000;
